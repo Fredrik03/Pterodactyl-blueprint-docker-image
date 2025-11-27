@@ -21,6 +21,7 @@ else
     export DB_PORT="${DB_PORT_RAW:-3306}"
 fi
 
+echo "[Wrapper] Starting upstream entrypoint with: $@"
 exec /bin/ash /app/.github/docker/entrypoint.sh "$@"
 
 

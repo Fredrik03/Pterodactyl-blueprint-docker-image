@@ -80,4 +80,5 @@ RUN printf '\n[program:database-seeder]\n' >> /etc/supervisord.conf && \
     printf 'user=root\nautostart=true\nautorestart=false\nstartsecs=0\npriority=1\n' >> /etc/supervisord.conf
 
 ENTRYPOINT ["/usr/local/bin/ptero-entrypoint-wrapper.sh"]
-CMD ["/usr/bin/supervisord", "--configuration=/etc/supervisord.conf"]
+# Ensure supervisord is launched (matches upstream CMD exactly)
+CMD ["supervisord", "-n", "-c", "/etc/supervisord.conf"]
