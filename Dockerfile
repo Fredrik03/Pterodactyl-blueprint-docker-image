@@ -31,26 +31,15 @@ RUN RELEASE_URL=$(curl -s https://api.github.com/repos/BlueprintFramework/framew
     unzip -o /app/release.zip -d /app && \
     rm /app/release.zip
 
-# Create .blueprintrc with sensible defaults
-# Check if www-data exists (common for PHP apps), otherwise use nginx
-RUN if id -u www-data >/dev/null 2>&1; then \
-        echo 'WEBUSER="www-data";' > /app/.blueprintrc && \
-        echo 'OWNERSHIP="www-data:www-data";' >> /app/.blueprintrc && \
-        echo 'USERSHELL="/bin/bash";' >> /app/.blueprintrc; \
-    elif id -u nginx >/dev/null 2>&1; then \
-        echo 'WEBUSER="nginx";' > /app/.blueprintrc && \
-        echo 'OWNERSHIP="nginx:nginx";' >> /app/.blueprintrc && \
-        echo 'USERSHELL="/bin/sh";' >> /app/.blueprintrc; \
-    else \
-        echo 'WEBUSER="root";' > /app/.blueprintrc && \
-        echo 'OWNERSHIP="root:root";' >> /app/.blueprintrc && \
-        echo 'USERSHELL="/bin/sh";' >> /app/.blueprintrc; \
-    fi
+# Create .blueprintrc with sensible defaults (nginx for this image)
+RUN echo 'WEBUSER="nginx";' > /app/.blueprintrc && \
+    echo 'OWNERSHIP="nginx:nginx";' >> /app/.blueprintrc && \
+    echo 'USERSHELL="/bin/bash";' >> /app/.blueprintrc
 
 # Ensure blueprint.sh is executable
 RUN chmod +x /app/blueprint.sh
 
-# Create Blueprint directory structure (minimal fallback to prevent startup errors)
+# Create Blueprint directory structure (prevents startup errors before init runs)
 RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
     mkdir -p /app/.blueprint/extensions/blueprint/private/debug && \
     mkdir -p /app/.blueprint/extensions/blueprint/public && \
@@ -66,9 +55,10 @@ RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
 # Create extensions directory (will be overridden by volume mount)
 RUN mkdir -p /srv/pterodactyl/extensions
 
-# Copy Blueprint initialization script (run manually after first start)
-COPY docker-entrypoint.sh /blueprint-init.sh
+# Copy Blueprint auto-init script and supervisor config
+COPY blueprint-init.sh /blueprint-init.sh
+COPY supervisord-blueprint.conf /etc/supervisord.d/blueprint.conf
 RUN chmod +x /blueprint-init.sh
 
-# DO NOT override ENTRYPOINT - use the original Pterodactyl entrypoint
-
+# The init script will run automatically via supervisord on container start
+# It checks if already initialized and skips if so
