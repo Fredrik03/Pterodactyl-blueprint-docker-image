@@ -50,7 +50,7 @@ Because this mirrors the official Blueprint Docker flow, you never have to exec 
 
 Blueprint runs inside `/app`, so you interact with it through Docker:
 
-```bash
+
 # Enter the container
 docker exec -it Pterodactyl-Panel bash
 
