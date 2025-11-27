@@ -24,27 +24,6 @@ No manual steps required!
 - Docker installed and running
 - GitHub Personal Access Token (PAT) with `write:packages` permission
 
-### Build Steps
-
-1. **Log in to GitHub Container Registry**:
-
-   ```bash
-   export CR_PAT=YOUR_GHCR_TOKEN_HERE
-   echo $CR_PAT | docker login ghcr.io -u fredrik03 --password-stdin
-   ```
-
-2. **Build the image**:
-
-   ```bash
-   docker build -t ghcr.io/fredrik03/pteropanel-blueprint:latest .
-   ```
-
-3. **Push to registry**:
-
-   ```bash
-   docker push ghcr.io/fredrik03/pteropanel-blueprint:latest
-   ```
-
 ## Unraid Configuration
 
 ### Important Notes
