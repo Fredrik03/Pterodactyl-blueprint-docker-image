@@ -39,7 +39,7 @@ RUN echo 'WEBUSER="nginx";' > /app/.blueprintrc && \
 # Ensure blueprint.sh is executable
 RUN chmod +x /app/blueprint.sh
 
-# Create Blueprint directory structure (prevents startup errors before init runs)
+# Create Blueprint directory structure (prevents startup errors)
 RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
     mkdir -p /app/.blueprint/extensions/blueprint/private/debug && \
     mkdir -p /app/.blueprint/extensions/blueprint/public && \
@@ -52,26 +52,7 @@ RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
     echo '{}' > /app/.blueprint/data/settings.json && \
     chown -R nginx:nginx /app/.blueprint
 
-# Create extensions directory (will be overridden by volume mount)
+# Create extensions directory (mount your .blueprint files here)
 RUN mkdir -p /srv/pterodactyl/extensions
 
-# Rename original entrypoint and copy our wrapper
-RUN mv /entrypoint.sh /original-entrypoint.sh
-COPY entrypoint.sh /entrypoint.sh
-COPY blueprint-init.sh /blueprint-init.sh
-RUN chmod +x /entrypoint.sh /original-entrypoint.sh /blueprint-init.sh
-
-# Add Blueprint init to supervisord.conf (runs full setup after panel starts)
-RUN echo "" >> /etc/supervisord.conf && \
-    echo "[program:blueprint-init]" >> /etc/supervisord.conf && \
-    echo "command=/blueprint-init.sh" >> /etc/supervisord.conf && \
-    echo "autostart=true" >> /etc/supervisord.conf && \
-    echo "autorestart=false" >> /etc/supervisord.conf && \
-    echo "startsecs=0" >> /etc/supervisord.conf && \
-    echo "startretries=1" >> /etc/supervisord.conf && \
-    echo "stdout_logfile=/var/log/supervisord/blueprint-init.log" >> /etc/supervisord.conf && \
-    echo "stderr_logfile=/var/log/supervisord/blueprint-init.log" >> /etc/supervisord.conf && \
-    echo "priority=1" >> /etc/supervisord.conf
-
-# Use original ENTRYPOINT/CMD - our entrypoint.sh replaces the original
-# and calls /original-entrypoint.sh after creating Blueprint files
+# No entrypoint override - use the original Pterodactyl startup
