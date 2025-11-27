@@ -11,7 +11,8 @@ RUN apk add --no-cache \
     bash \
     ca-certificates \
     ncurses \
-    coreutils
+    coreutils \
+    netcat-openbsd
 
 # Install Yarn globally
 RUN npm install -g yarn
@@ -54,5 +55,17 @@ RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
 
 # Create extensions directory (mount your .blueprint files here)
 RUN mkdir -p /srv/pterodactyl/extensions
+
+# Copy Blueprint auto-initializer
+COPY scripts/blueprint-auto.sh /usr/local/bin/blueprint-auto.sh
+RUN chmod +x /usr/local/bin/blueprint-auto.sh && \
+    mkdir -p /var/log/supervisord
+
+# Configure supervisord to run Blueprint auto-initializer once the panel boots
+RUN printf '\n[program:blueprint-auto]\n' >> /etc/supervisord.conf && \
+    printf 'command=/usr/local/bin/blueprint-auto.sh\n' >> /etc/supervisord.conf && \
+    printf 'autostart=true\nautorestart=false\nstartsecs=0\npriority=5\n' >> /etc/supervisord.conf && \
+    printf 'stdout_logfile=/var/log/supervisord/blueprint-auto.log\n' >> /etc/supervisord.conf && \
+    printf 'stderr_logfile=/var/log/supervisord/blueprint-auto.log\n' >> /etc/supervisord.conf
 
 # No entrypoint override - use the original Pterodactyl startup
