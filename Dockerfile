@@ -1,77 +1,83 @@
-FROM ghcr.io/pterodactyl/panel:latest
+ARG PANEL_VERSION=latest
+FROM --platform=$TARGETOS/$TARGETARCH ghcr.io/pterodactyl/panel:${PANEL_VERSION}
 
-# Install tools needed for Blueprint & assets
-RUN apk add --no-cache \
-    curl \
-    unzip \
-    zip \
-    git \
-    nodejs \
-    npm \
-    bash \
-    ca-certificates \
-    ncurses \
-    coreutils \
-    netcat-openbsd
-
-# Install Yarn globally
-RUN npm install -g yarn
-
-# Set working directory to panel root
 WORKDIR /app
 
-# Install panel JS dependencies
-RUN yarn install --ignore-engines
+# Install packages required for Blueprint and helpers
+RUN apk update && apk add --no-cache \
+    unzip \
+    zip \
+    curl \
+    git \
+    bash \
+    wget \
+    nodejs \
+    npm \
+    coreutils \
+    build-base \
+    musl-dev \
+    libgcc \
+    openssl \
+    openssl-dev \
+    linux-headers \
+    ncurses \
+    rsync \
+    inotify-tools \
+    sed \
+    musl-locales \
+    netcat-openbsd && \
+    rm -rf /var/cache/apk/*
+
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+RUN printf 'export LANG=C.UTF-8\nexport LC_ALL=C.UTF-8\n' > /etc/profile.d/locale.sh
 
 # Download and install latest Blueprint release
 RUN RELEASE_URL=$(curl -s https://api.github.com/repos/BlueprintFramework/framework/releases/latest \
-    | grep "browser_download_url.*\.zip" \
-    | head -n 1 \
-    | cut -d '"' -f 4) && \
-    curl -L -o /app/release.zip "$RELEASE_URL" && \
-    unzip -o /app/release.zip -d /app && \
-    rm /app/release.zip
+    | grep "browser_download_url" \
+    | cut -d '"' -f 4 \
+    | head -n 1) && \
+    wget "$RELEASE_URL" -O blueprint.zip && \
+    unzip -o blueprint.zip -d /app && \
+    touch /.dockerenv && \
+    rm blueprint.zip
 
-# Create .blueprintrc with sensible defaults (nginx for this image)
-RUN echo 'WEBUSER="nginx";' > /app/.blueprintrc && \
-    echo 'OWNERSHIP="nginx:nginx";' >> /app/.blueprintrc && \
-    echo 'USERSHELL="/bin/bash";' >> /app/.blueprintrc
+# Install panel JS dependencies & update browserslist
+RUN for i in 1 2 3; do \
+        npm install -g yarn && \
+        yarn --network-timeout 120000 && \
+        npx update-browserslist-db@latest && \
+        break || (echo "Attempt $i failed! Retrying..." && sleep 10); \
+    done
 
-# Ensure blueprint.sh is executable
-RUN chmod +x /app/blueprint.sh
+ENV TERM=xterm
 
-# Create Blueprint directory structure (prevents startup errors)
-RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
-    mkdir -p /app/.blueprint/extensions/blueprint/private/debug && \
-    mkdir -p /app/.blueprint/extensions/blueprint/public && \
-    mkdir -p /app/.blueprint/data && \
-    echo '<?php return [];' > /app/.blueprint/extensions/blueprint/private/extensionfs.php && \
-    touch /app/.blueprint/extensions/blueprint/private/db/installed_extensions && \
-    touch /app/.blueprint/extensions/blueprint/private/db/database && \
-    touch /app/.blueprint/extensions/blueprint/private/debug/logs.txt && \
-    touch /app/.blueprint/extensions/blueprint/public/index.html && \
-    echo '{}' > /app/.blueprint/data/settings.json && \
-    chown -R nginx:nginx /app/.blueprint
+# Helpers (.blueprintrc + runtime scripts)
+COPY .helpers /helpers
+RUN mv /helpers/.blueprintrc /app/.blueprintrc && \
+    chmod +x /helpers/*.sh
 
-# Create extensions directory (mount your .blueprint files here)
+# Run Blueprint installer during build
+RUN chmod +x blueprint.sh && \
+    bash blueprint.sh
+
+# Directory for Blueprint extension volume
 RUN mkdir -p /srv/pterodactyl/extensions
 
-# Copy Blueprint auto-initializer and entrypoint wrapper
-COPY scripts/blueprint-auto.sh /usr/local/bin/blueprint-auto.sh
+# Copy entrypoint wrapper (normalizes DB_HOST/DB_PORT)
 COPY scripts/entrypoint-wrapper.sh /usr/local/bin/ptero-entrypoint-wrapper.sh
-RUN chmod +x /usr/local/bin/blueprint-auto.sh \
-    /usr/local/bin/ptero-entrypoint-wrapper.sh && \
-    mkdir -p /var/log/supervisord
+RUN chmod +x /usr/local/bin/ptero-entrypoint-wrapper.sh
 
-# Configure supervisord to run Blueprint auto-initializer once the panel boots
-RUN printf '\n[program:blueprint-auto]\n' >> /etc/supervisord.conf && \
-    printf 'command=/usr/local/bin/blueprint-auto.sh\n' >> /etc/supervisord.conf && \
-    printf 'autostart=true\nautorestart=false\nstartsecs=0\npriority=5\n' >> /etc/supervisord.conf && \
-    printf 'stdout_logfile=/var/log/supervisord/blueprint-auto.log\n' >> /etc/supervisord.conf && \
-    printf 'stderr_logfile=/var/log/supervisord/blueprint-auto.log\n' >> /etc/supervisord.conf
+# Register helper processes with supervisord
+RUN printf '\n[program:database-seeder]\n' >> /etc/supervisord.conf && \
+    printf 'command=/helpers/seeder.sh\n' >> /etc/supervisord.conf && \
+    printf 'user=nginx\nautostart=true\nautorestart=false\nstartsecs=0\n' >> /etc/supervisord.conf && \
+    printf '\n[program:listener]\n' >> /etc/supervisord.conf && \
+    printf 'command=/helpers/listen.sh\n' >> /etc/supervisord.conf && \
+    printf 'user=root\nautostart=true\nautorestart=true\n' >> /etc/supervisord.conf && \
+    printf '\n[program:fix-bind-mount-perms]\n' >> /etc/supervisord.conf && \
+    printf 'command=/helpers/permissions.sh\n' >> /etc/supervisord.conf && \
+    printf 'user=root\nautostart=true\nautorestart=false\nstartsecs=0\npriority=1\n' >> /etc/supervisord.conf
 
-# Normalize DB_HOST/DB_PORT before upstream entrypoint runs
 ENTRYPOINT ["/usr/local/bin/ptero-entrypoint-wrapper.sh"]
-
-# Ensure supervisord is launched (same as upstream image)
 CMD ["/usr/bin/supervisord", "--configuration=/etc/supervisord.conf"]
