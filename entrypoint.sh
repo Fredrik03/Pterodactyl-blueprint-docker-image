@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/ash
 
-# Wrapper entrypoint that ensures Blueprint files exist before panel starts
-# This is needed because mounting /app/.blueprint as a volume hides the files
-# created during docker build
+# Blueprint wrapper entrypoint
+# Creates Blueprint files BEFORE the original Pterodactyl entrypoint runs
+# This is needed because volume mounts hide files created during docker build
 
 echo "[Blueprint] Checking Blueprint files..."
 
@@ -21,24 +21,12 @@ if [ ! -f "/app/.blueprint/extensions/blueprint/private/extensionfs.php" ]; then
     touch /app/.blueprint/extensions/blueprint/public/index.html
     echo '{}' > /app/.blueprint/data/settings.json
     
-    chown -R nginx:nginx /app/.blueprint
+    chown -R nginx:nginx /app/.blueprint 2>/dev/null || true
     echo "[Blueprint] Directory structure created!"
 else
-    echo "[Blueprint] Files already exist, skipping."
+    echo "[Blueprint] Files already exist."
 fi
 
-# Find and execute the original Pterodactyl entrypoint
-# The official image uses /entrypoint.sh
-if [ -f "/entrypoint.sh" ] && [ "$0" != "/entrypoint.sh" ]; then
-    echo "[Blueprint] Executing original entrypoint..."
-    exec /entrypoint.sh "$@"
-fi
-
-# If no specific entrypoint, just exec the command passed to us
-if [ $# -gt 0 ]; then
-    exec "$@"
-fi
-
-# Fallback: start supervisord directly
-echo "[Blueprint] Starting supervisord..."
-exec supervisord -n -c /etc/supervisord.conf
+# Execute the original Pterodactyl entrypoint
+echo "[Blueprint] Starting Pterodactyl Panel..."
+exec /original-entrypoint.sh "$@"
