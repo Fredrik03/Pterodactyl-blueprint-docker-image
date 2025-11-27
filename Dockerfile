@@ -56,9 +56,11 @@ RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
 # Create extensions directory (mount your .blueprint files here)
 RUN mkdir -p /srv/pterodactyl/extensions
 
-# Copy Blueprint auto-initializer
+# Copy Blueprint auto-initializer and entrypoint wrapper
 COPY scripts/blueprint-auto.sh /usr/local/bin/blueprint-auto.sh
-RUN chmod +x /usr/local/bin/blueprint-auto.sh && \
+COPY scripts/entrypoint-wrapper.sh /usr/local/bin/ptero-entrypoint-wrapper.sh
+RUN chmod +x /usr/local/bin/blueprint-auto.sh \
+    /usr/local/bin/ptero-entrypoint-wrapper.sh && \
     mkdir -p /var/log/supervisord
 
 # Configure supervisord to run Blueprint auto-initializer once the panel boots
@@ -68,4 +70,5 @@ RUN printf '\n[program:blueprint-auto]\n' >> /etc/supervisord.conf && \
     printf 'stdout_logfile=/var/log/supervisord/blueprint-auto.log\n' >> /etc/supervisord.conf && \
     printf 'stderr_logfile=/var/log/supervisord/blueprint-auto.log\n' >> /etc/supervisord.conf
 
-# No entrypoint override - use the original Pterodactyl startup
+# Normalize DB_HOST/DB_PORT before upstream entrypoint runs
+ENTRYPOINT ["/usr/local/bin/ptero-entrypoint-wrapper.sh"]
