@@ -55,10 +55,24 @@ RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
 # Create extensions directory (will be overridden by volume mount)
 RUN mkdir -p /srv/pterodactyl/extensions
 
-# Copy Blueprint auto-init script and supervisor config
+# Copy Blueprint scripts
 COPY blueprint-init.sh /blueprint-init.sh
-COPY supervisord-blueprint.conf /etc/supervisord.d/blueprint.conf
-RUN chmod +x /blueprint-init.sh
+COPY entrypoint.sh /entrypoint-wrapper.sh
+RUN chmod +x /blueprint-init.sh /entrypoint-wrapper.sh
 
-# The init script will run automatically via supervisord on container start
-# It checks if already initialized and skips if so
+# Add Blueprint init to supervisord.conf (runs full setup after panel starts)
+RUN echo "" >> /etc/supervisord.conf && \
+    echo "[program:blueprint-init]" >> /etc/supervisord.conf && \
+    echo "command=/blueprint-init.sh" >> /etc/supervisord.conf && \
+    echo "autostart=true" >> /etc/supervisord.conf && \
+    echo "autorestart=false" >> /etc/supervisord.conf && \
+    echo "startsecs=0" >> /etc/supervisord.conf && \
+    echo "startretries=1" >> /etc/supervisord.conf && \
+    echo "stdout_logfile=/var/log/supervisord/blueprint-init.log" >> /etc/supervisord.conf && \
+    echo "stderr_logfile=/var/log/supervisord/blueprint-init.log" >> /etc/supervisord.conf && \
+    echo "priority=1" >> /etc/supervisord.conf
+
+# Use wrapper entrypoint to create Blueprint files before panel starts
+# This is needed because volume mounts hide files created during build
+ENTRYPOINT ["/entrypoint-wrapper.sh"]
+# No CMD needed - wrapper will find and exec original entrypoint or start supervisord
