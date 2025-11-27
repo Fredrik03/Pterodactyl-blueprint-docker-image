@@ -72,3 +72,6 @@ RUN printf '\n[program:blueprint-auto]\n' >> /etc/supervisord.conf && \
 
 # Normalize DB_HOST/DB_PORT before upstream entrypoint runs
 ENTRYPOINT ["/usr/local/bin/ptero-entrypoint-wrapper.sh"]
+
+# Ensure supervisord is launched (same as upstream image)
+CMD ["/usr/bin/supervisord", "--configuration=/etc/supervisord.conf"]
