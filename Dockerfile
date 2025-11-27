@@ -45,16 +45,24 @@ RUN if id -u www-data >/dev/null 2>&1; then \
     fi
 
 # Ensure blueprint.sh is executable
-RUN chmod +x /app/blueprint.sh || true
+RUN chmod +x /app/blueprint.sh
 
-# Create the Blueprint directory structure that the panel expects
-RUN mkdir -p /app/.blueprint/extensions/blueprint/private && \
+# Create Blueprint directory structure (minimal fallback to prevent startup errors)
+RUN mkdir -p /app/.blueprint/extensions/blueprint/private/db && \
     mkdir -p /app/.blueprint/extensions/blueprint/public && \
-    touch /app/.blueprint/extensions/blueprint/private/extensionfs.php && \
-    echo '<?php return [];' > /app/.blueprint/extensions/blueprint/private/extensionfs.php
+    mkdir -p /app/.blueprint/data && \
+    echo '<?php return [];' > /app/.blueprint/extensions/blueprint/private/extensionfs.php && \
+    touch /app/.blueprint/extensions/blueprint/private/db/installed_extensions && \
+    echo '{}' > /app/.blueprint/data/settings.json && \
+    chown -R nginx:nginx /app/.blueprint
 
 # Create extensions directory (will be overridden by volume mount)
 RUN mkdir -p /srv/pterodactyl/extensions
 
-# Note: We do NOT override ENTRYPOINT or CMD - use base image defaults
+# Copy custom entrypoint that initializes Blueprint on first run (when DB is available)
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Override entrypoint to run Blueprint setup before panel starts
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
