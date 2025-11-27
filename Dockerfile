@@ -47,6 +47,12 @@ RUN if id -u www-data >/dev/null 2>&1; then \
 # Ensure blueprint.sh is executable
 RUN chmod +x /app/blueprint.sh || true
 
+# Create the Blueprint directory structure that the panel expects
+RUN mkdir -p /app/.blueprint/extensions/blueprint/private && \
+    mkdir -p /app/.blueprint/extensions/blueprint/public && \
+    touch /app/.blueprint/extensions/blueprint/private/extensionfs.php && \
+    echo '<?php return [];' > /app/.blueprint/extensions/blueprint/private/extensionfs.php
+
 # Create extensions directory (will be overridden by volume mount)
 RUN mkdir -p /srv/pterodactyl/extensions
 
