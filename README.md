@@ -11,17 +11,6 @@ Custom Docker image based on `ghcr.io/pterodactyl/panel` with [Blueprint Framewo
 - ✓ Keeps nginx-owned bind mounts writable (same technique as the Blueprint Docker repo)
 - ✓ Works with Unraid templates that set `DB_HOST` to `host:port` (entrypoint wrapper normalizes it)
 
-## Build & Push
-
-```bash
-export CR_PAT=YOUR_GHCR_TOKEN
-echo $CR_PAT | docker login ghcr.io -u fredrik03 --password-stdin
-docker build -t ghcr.io/fredrik03/pteropanel-blueprint:latest .
-docker push ghcr.io/fredrik03/pteropanel-blueprint:latest
-```
-
-Or trigger the included GitHub Actions workflow (`.github/workflows/build.yml`).
-
 ## Unraid Setup
 
 1. Edit your existing panel container
