@@ -2,10 +2,29 @@
 
 Custom Docker image based on `ghcr.io/pterodactyl/panel` with [Blueprint Framework](https://blueprint.zip) pre-installed plus the same helper services used by the upstream [BlueprintFramework/docker](https://github.com/BlueprintFramework/docker) project. A listener keeps your `.blueprint` files in sync, permissions are fixed on boot, and the Blueprint seeder runs automatically after the panel connects to your database.
 
+## Versions
+
+| Component | Pinned version | Where |
+|-----------|----------------|-------|
+| Pterodactyl panel | `v1.15.1` | `ARG PANEL_VERSION` in the Dockerfile |
+| Blueprint | `beta-2026-08` (SHA256-verified) | `ARG BLUEPRINT_VERSION` in the Dockerfile |
+| Wings (on your node) | `v1.13.3` | your node's Wings install — **not** part of this image |
+
+Versions are pinned on purpose. The panel and Wings must be upgraded together:
+panels older than 1.12 issue websocket tokens without the `scope` claim that
+Wings 1.13+ requires, which breaks the server console with
+*"There was an error validating the credentials provided for the websocket"*.
+Do not run `wings:latest` on the node — pin it to a version that matches the
+panel baked into this image.
+
+To upgrade later: bump `PANEL_VERSION` and `BLUEPRINT_VERSION`/`BLUEPRINT_SHA256`
+in the Dockerfile (check the Blueprint release supports the new panel first),
+rebuild via the GitHub workflow, then follow **Upgrading a live deployment** below.
+
 ## Highlights
 
 - ✓ Uses the official Pterodactyl panel image (`ghcr.io/pterodactyl/panel`)
-- ✓ Installs the newest Blueprint release at build time
+- ✓ Installs a pinned, checksum-verified Blueprint release at build time
 - ✓ Automatically seeds Blueprint tables once MySQL is reachable
 - ✓ Watches `/srv/pterodactyl/extensions` and mirrors `.blueprint` files into `/app`
 - ✓ Keeps nginx-owned bind mounts writable (same technique as the Blueprint Docker repo)
@@ -58,6 +77,23 @@ Tip: add an alias on your Unraid box to avoid typing the full command:
 ```bash
 echo 'alias blueprint="docker exec -it Pterodactyl-Panel blueprint"' >> ~/.bashrc
 ```
+
+## Upgrading a live deployment
+
+The panel image runs `php artisan migrate --seed --force` automatically on boot,
+so switching to an image with a newer panel migrates your database on first
+start. Migrations are one-way — take a backup first.
+
+1. **Back up the database**: `mysqldump -h <db-host> -u <user> -p panel > panel-backup.sql`
+2. Pull the new image and recreate the container (Unraid: force update / apply).
+3. Watch the first boot: `docker logs -f Pterodactyl-Panel` — you should see
+   "Migrating and Seeding D.B" complete without errors.
+4. Re-install your Blueprint extensions (`blueprint -i ...`). Check each
+   extension's page for compatibility with the new panel version first —
+   extensions built against an older panel may need updates.
+5. Upgrade Wings on the node to the matching pinned version and restart it.
+6. Hard-refresh the browser (cached frontend assets) and confirm the server
+   console connects.
 
 ## Troubleshooting
 

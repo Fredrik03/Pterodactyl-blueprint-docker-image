@@ -1,4 +1,7 @@
-ARG PANEL_VERSION=latest
+# Pinned panel version. Wings on the node must be kept in step with this:
+# panel v1.15.x pairs with wings v1.13.x (older panels issue websocket JWTs
+# without the "scope" claim wings 1.13+ requires, breaking the server console).
+ARG PANEL_VERSION=v1.15.1
 FROM --platform=$TARGETOS/$TARGETARCH ghcr.io/pterodactyl/panel:${PANEL_VERSION}
 
 WORKDIR /app
@@ -32,12 +35,12 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 RUN printf 'export LANG=C.UTF-8\nexport LC_ALL=C.UTF-8\n' > /etc/profile.d/locale.sh
 
-# Download and install latest Blueprint release
-RUN RELEASE_URL=$(curl -s https://api.github.com/repos/BlueprintFramework/framework/releases/latest \
-    | grep "browser_download_url" \
-    | cut -d '"' -f 4 \
-    | head -n 1) && \
-    wget "$RELEASE_URL" -O blueprint.zip && \
+# Pinned Blueprint release, verified against its published SHA256.
+# When bumping BLUEPRINT_VERSION, update BLUEPRINT_SHA256 from the release notes.
+ARG BLUEPRINT_VERSION=beta-2026-08
+ARG BLUEPRINT_SHA256=38bcee33b19abcbb3460578236ead74668ec39a7861200bbc6902a9152ac118d
+RUN wget "https://github.com/BlueprintFramework/framework/releases/download/${BLUEPRINT_VERSION}/release.zip" -O blueprint.zip && \
+    echo "${BLUEPRINT_SHA256}  blueprint.zip" | sha256sum -c - && \
     unzip -o blueprint.zip -d /app && \
     touch /.dockerenv && \
     rm blueprint.zip

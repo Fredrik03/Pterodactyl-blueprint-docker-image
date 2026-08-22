@@ -21,6 +21,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Read pinned panel version from Dockerfile
+        id: versions
+        run: echo "panel=$(sed -n 's/^ARG PANEL_VERSION=//p' Dockerfile)" >> "$GITHUB_OUTPUT"
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -28,6 +32,7 @@ jobs:
           images: ghcr.io/fredrik03/pteropanel-blueprint
           tags: |
             type=raw,value=latest
+            type=raw,value=${{ steps.versions.outputs.panel }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
