@@ -1,0 +1,8 @@
+# Built extension packages (run extensions/package.sh to recreate)
+extensions/*.blueprint
+.DS_Store
+# Third-party extension sources (modified locally; licence not confirmed, so not tracked)
+extensions/mcplugins/
+extensions/version/
+# Blueprint docs are AGPL-licensed upstream material; keep local copies out of git.
+.claude/skills/blueprint-extension-dev/references/docs/

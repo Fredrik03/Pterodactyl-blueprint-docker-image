@@ -64,6 +64,11 @@ RUN mv /helpers/.blueprintrc /app/.blueprintrc && \
 RUN chmod +x blueprint.sh && \
     bash blueprint.sh
 
+# Bundled Forge egg with a fixed install script (exact version matching, Minecraft 26.x support).
+# The panel re-seeds bundled eggs on every boot, so overriding the file here fixes the existing
+# "Forge Minecraft" egg in place. Source of the script: eggs/forge-install.sh
+COPY eggs/egg-forge-minecraft.json /app/database/Seeders/eggs/minecraft/egg-forge-minecraft.json
+
 # Directory for Blueprint extension volume
 RUN mkdir -p /srv/pterodactyl/extensions
 
