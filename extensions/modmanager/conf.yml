@@ -1,0 +1,37 @@
+info:
+  name: "Mod Manager"
+  identifier: "modmanager"
+  description: "Browse, install, update and remove Minecraft mods from Modrinth and CurseForge inside the server panel. The Mods tab only activates on servers that run a mod loader (Forge, NeoForge, Fabric or Quilt)."
+  flags: ""
+  version: "1.0.0"
+  target: "beta-2026-08"
+  author: "Fredrik03"
+  icon: "icon.svg"
+  website: "https://github.com/Fredrik03/Pterodactyl-blueprint-docker-image"
+
+admin:
+  view: "admin/view.blade.php"
+  controller: "admin/controller.php"
+  css: ""
+  wrapper: ""
+
+dashboard:
+  css: ""
+  wrapper: ""
+  components: "components"
+
+data:
+  directory: "data"
+  public: ""
+  console: ""
+
+requests:
+  views: ""
+  app: "app"
+  routers:
+    application: ""
+    client: "routes/client.php"
+    web: ""
+
+database:
+  migrations: "migrations"

@@ -1,0 +1,6 @@
+# Learn more about the Components API:
+# https://blueprint.zip/docs/configs/componentsyml
+
+Navigation:
+  Routes:
+    - { Name: "Mods", Path: "/mods", Type: "server", Component: "ModManagerContainer", Permission: "'file.read'", AdminOnly: "false" }

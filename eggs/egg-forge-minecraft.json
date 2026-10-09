@@ -1,0 +1,81 @@
+{
+    "_comment": "DO NOT EDIT: FILE GENERATED AUTOMATICALLY BY PTERODACTYL PANEL - PTERODACTYL.IO",
+    "meta": {
+        "version": "PTDL_v2",
+        "update_url": null
+    },
+    "exported_at": "2026-04-05T20:12:54+02:00",
+    "name": "Forge Minecraft",
+    "author": "support@pterodactyl.io",
+    "description": "Minecraft Forge Server. Minecraft Forge is a modding API (Application Programming Interface), which makes it easier to create mods, and also make sure mods are compatible with each other.\n\nThis copy ships with the pteropanel-blueprint image: its install script matches Forge versions exactly and handles Minecraft 26.x (see eggs/forge-install.sh in the image repository).",
+    "features": [
+        "eula",
+        "java_version",
+        "pid_limit"
+    ],
+    "docker_images": {
+        "Java 25": "ghcr.io/pterodactyl/yolks:java_25",
+        "Java 21": "ghcr.io/pterodactyl/yolks:java_21",
+        "Java 17": "ghcr.io/pterodactyl/yolks:java_17",
+        "Java 16": "ghcr.io/pterodactyl/yolks:java_16",
+        "Java 11": "ghcr.io/pterodactyl/yolks:java_11",
+        "Java 8": "ghcr.io/pterodactyl/yolks:java_8"
+    },
+    "file_denylist": [],
+    "startup": "java -Xms128M -XX:MaxRAMPercentage=95.0 -Dterminal.jline=false -Dterminal.ansi=true $( [[  ! -f unix_args.txt ]] && printf %s \"-jar {{SERVER_JARFILE}}\" || printf %s \"@unix_args.txt\" )",
+    "config": {
+        "files": "{\r\n    \"server.properties\": {\r\n        \"parser\": \"properties\",\r\n        \"find\": {\r\n            \"server-ip\": \"0.0.0.0\",\r\n            \"server-port\": \"{{server.build.default.port}}\",\r\n            \"query.port\": \"{{server.build.default.port}}\"\r\n        }\r\n    }\r\n}",
+        "startup": "{\r\n    \"done\": \")! For help, type \"\r\n}",
+        "logs": "{}",
+        "stop": "stop"
+    },
+    "scripts": {
+        "installation": {
+            "script": "#!/bin/bash\n# Forge Installation Script\n#\n# Server Files: /mnt/server\n#\n# Fixed version of the install script bundled with Pterodactyl 1.15.1:\n#  - version keys are matched exactly (\"1.21.1\" no longer also matches 1.21.10 / 1.21.11),\n#  - whether to link unix_args.txt or rename a jar is decided by what the installer\n#    produced, so Minecraft 26.x (and anything newer) works instead of silently\n#    leaving a server with no jar and no unix_args.txt,\n#  - a broken result fails the install instead of reporting success.\napt update\napt install -y curl jq\n\nif [[ ! -d /mnt/server ]]; then\n  mkdir /mnt/server\nfi\n\ncd /mnt/server\n\n# Remove spaces from the version number to avoid issues with curl\nFORGE_VERSION=\"$(echo \"$FORGE_VERSION\" | tr -d ' ')\"\nMC_VERSION=\"$(echo \"$MC_VERSION\" | tr -d ' ')\"\nFILE_SITE=https://maven.minecraftforge.net/net/minecraftforge/forge/\n\nif [[ -n ${FORGE_VERSION} ]]; then\n  DOWNLOAD_LINK=${FILE_SITE}${FORGE_VERSION}/forge-${FORGE_VERSION}\n  FORGE_JAR=forge-${FORGE_VERSION}*.jar\nelse\n  JSON_DATA=$(curl -sSL https://files.minecraftforge.net/maven/net/minecraftforge/forge/promotions_slim.json)\n  if [[ -z \"${JSON_DATA}\" ]]; then\n    echo -e \"Could not download the Forge promotions list. Exiting now\"\n    exit 1\n  fi\n\n  if [[ \"${MC_VERSION}\" == \"latest\" ]] || [[ \"${MC_VERSION}\" == \"\" ]]; then\n    echo -e \"getting latest version of forge.\"\n    MC_VERSION=$(echo \"${JSON_DATA}\" | jq -r '.promos | del(.\"latest-1.7.10\") | del(.\"1.7.10-latest-1.7.10\") | to_entries[] | .key | select(endswith(\"-latest\")) | split(\"-\")[0]' | sort -t. -k 1,1n -k 2,2n -k 3,3n -k 4,4n | tail -1)\n    BUILD_TYPE=latest\n  fi\n\n  if [[ \"${BUILD_TYPE}\" != \"recommended\" ]] && [[ \"${BUILD_TYPE}\" != \"latest\" ]]; then\n    BUILD_TYPE=recommended\n  fi\n\n  echo -e \"minecraft version: ${MC_VERSION}\"\n  echo -e \"build type: ${BUILD_TYPE}\"\n\n  ## Exact key match. The original used \"contains\", which made 1.21.1 ambiguous once 1.21.10 and 1.21.11 existed.\n  VERSION_KEY=$(echo \"${JSON_DATA}\" | jq -r --arg KEY \"${MC_VERSION}-${BUILD_TYPE}\" '.promos | to_entries[] | .key | select(. == $KEY)')\n\n  if [[ -z \"${VERSION_KEY}\" ]] && [[ \"${BUILD_TYPE}\" == \"recommended\" ]]; then\n    echo -e \"dropping back to latest from recommended due to there not being a recommended version of forge for the mc version requested.\"\n    VERSION_KEY=$(echo \"${JSON_DATA}\" | jq -r --arg KEY \"${MC_VERSION}-latest\" '.promos | to_entries[] | .key | select(. == $KEY)')\n  fi\n\n  if [[ -z \"${VERSION_KEY}\" ]] || [[ \"${VERSION_KEY}\" == \"null\" ]]; then\n    echo -e \"The install failed because there is no valid version of forge for the version of minecraft selected (${MC_VERSION}).\"\n    exit 1\n  fi\n\n  FORGE_VERSION=$(echo \"${JSON_DATA}\" | jq -r --arg VERSION_KEY \"$VERSION_KEY\" '.promos | .[$VERSION_KEY]')\n\n  if [[ \"${MC_VERSION}\" == \"1.7.10\" ]] || [[ \"${MC_VERSION}\" == \"1.8.9\" ]]; then\n    DOWNLOAD_LINK=${FILE_SITE}${MC_VERSION}-${FORGE_VERSION}-${MC_VERSION}/forge-${MC_VERSION}-${FORGE_VERSION}-${MC_VERSION}\n    FORGE_JAR=forge-${MC_VERSION}-${FORGE_VERSION}-${MC_VERSION}.jar\n    if [[ \"${MC_VERSION}\" == \"1.7.10\" ]]; then\n      FORGE_JAR=forge-${MC_VERSION}-${FORGE_VERSION}-${MC_VERSION}-universal.jar\n    fi\n  else\n    DOWNLOAD_LINK=${FILE_SITE}${MC_VERSION}-${FORGE_VERSION}/forge-${MC_VERSION}-${FORGE_VERSION}\n    FORGE_JAR=forge-${MC_VERSION}-${FORGE_VERSION}.jar\n  fi\nfi\n\n#Adding .jar when not ending with SERVER_JARFILE\nif [[ ! $SERVER_JARFILE = *\\.jar ]]; then\n  SERVER_JARFILE=\"$SERVER_JARFILE.jar\"\nfi\n\n#Downloading jars\necho -e \"Downloading forge version ${FORGE_VERSION}\"\necho -e \"Download link is ${DOWNLOAD_LINK}\"\n\nif [[ -n \"${DOWNLOAD_LINK}\" ]]; then\n  if curl --output /dev/null --silent --head --fail ${DOWNLOAD_LINK}-installer.jar; then\n    echo -e \"installer jar download link is valid.\"\n  else\n    echo -e \"link is invalid. Exiting now\"\n    exit 2\n  fi\nelse\n  echo -e \"no download link provided. Exiting now\"\n  exit 3\nfi\n\ncurl -s -o installer.jar -sS ${DOWNLOAD_LINK}-installer.jar\n\n#Checking if downloaded jars exist\nif [[ ! -f ./installer.jar ]]; then\n  echo \"!!! Error downloading forge version ${FORGE_VERSION} !!!\"\n  exit 2\nfi\n\n# Delete args to support downgrading/upgrading\nrm -rf libraries/net/minecraftforge/forge\nrm -f unix_args.txt\n\n#Installing server\necho -e \"Installing forge server.\\n\"\njava -jar installer.jar --installServer || { echo -e \"\\nInstall failed using Forge version ${FORGE_VERSION} and Minecraft version ${MC_VERSION}.\\nShould you be using unlimited memory value of 0, make sure to increase the default install resource limits in the Wings config or specify exact allocated memory in the server Build Configuration instead of 0! \\nOtherwise, the Forge installer will not have enough memory.\"; exit 4; }\n\n# Decide by what the installer produced, not by the version number. Forge 1.17+ (and 26.x) ship\n# their launch arguments in libraries/net/minecraftforge/forge/<version>/unix_args.txt and no\n# runnable jar in the server root; older versions produce a jar that the startup command runs.\nARGS_FILE=$(ls libraries/net/minecraftforge/forge/*/unix_args.txt 2>/dev/null | head -n 1)\nif [[ -n \"${ARGS_FILE}\" ]]; then\n  echo -e \"Detected a Forge version that uses unix_args.txt (1.17 and newer). Setting up forge unix args.\"\n  ln -sf \"${ARGS_FILE}\" unix_args.txt\nelse\n  JAR=$(ls ${FORGE_JAR} 2>/dev/null | grep -v -- '-installer' | grep -v -- '-shim' | head -n 1)\n  if [[ -z \"${JAR}\" ]]; then\n    echo -e \"The installer finished but produced neither unix_args.txt nor a Forge server jar. Failing the install so this is visible.\"\n    exit 5\n  fi\n  echo -e \"Renaming ${JAR} to ${SERVER_JARFILE}\"\n  mv \"${JAR}\" \"${SERVER_JARFILE}\"\nfi\n\necho -e \"Deleting installer.jar file.\\n\"\nrm -rf installer.jar installer.jar.log\necho -e \"Installation process is completed\"\n",
+            "container": "eclipse-temurin:8-jdk-jammy",
+            "entrypoint": "bash"
+        }
+    },
+    "variables": [
+        {
+            "name": "Server Jar File",
+            "description": "The name of the Jarfile to use when running Forge version below 1.17.",
+            "env_variable": "SERVER_JARFILE",
+            "default_value": "server.jar",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|regex:/^([\\w\\d._-]+)(\\.jar)$/",
+            "field_type": "text"
+        },
+        {
+            "name": "Minecraft Version",
+            "description": "The version of minecraft you want to install for.\r\n\r\nLeaving latest will install the latest recommended version.",
+            "env_variable": "MC_VERSION",
+            "default_value": "latest",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|max:9",
+            "field_type": "text"
+        },
+        {
+            "name": "Build Type",
+            "description": "The type of server jar to download from forge.\r\n\r\nValid types are \"recommended\" and \"latest\".",
+            "env_variable": "BUILD_TYPE",
+            "default_value": "recommended",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:recommended,latest",
+            "field_type": "text"
+        },
+        {
+            "name": "Forge Version",
+            "description": "The full exact version.\r\n\r\nEx. 1.15.2-31.2.4\r\n\r\nOverrides MC_VERSION and BUILD_TYPE. If it fails to download the server files it will fail to install.",
+            "env_variable": "FORGE_VERSION",
+            "default_value": "",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "nullable|regex:/^[0-9\\.\\-]+$/",
+            "field_type": "text"
+        }
+    ]
+}

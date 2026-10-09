@@ -78,6 +78,56 @@ Tip: add an alias on your Unraid box to avoid typing the full command:
 echo 'alias blueprint="docker exec -it Pterodactyl-Panel blueprint"' >> ~/.bashrc
 ```
 
+## Bundled extensions
+
+Extensions developed for this image live in `extensions/`. Each folder is a Blueprint extension
+source tree; `extensions/package.sh <id>` zips it into `extensions/<id>.blueprint`.
+
+| Extension | What it does |
+|-----------|--------------|
+| [`modmanager`](extensions/modmanager/README.md) | Adds a **Mods** tab to Forge/NeoForge/Fabric/Quilt servers: search Modrinth and CurseForge, install mods and their dependencies into `/mods`, list installed mods, disable, update or remove them. Locked on servers without a mod loader. |
+
+Install a bundled extension:
+
+```bash
+./extensions/package.sh modmanager
+docker cp extensions/modmanager.blueprint Pterodactyl-Panel:/app/
+docker exec -it Pterodactyl-Panel blueprint -i modmanager
+```
+
+The repository also ships a Claude Code skill (`.claude/skills/blueprint-extension-dev`) with the
+Blueprint docs and framework notes used to build these extensions.
+
+### Locally modified third-party extensions
+
+`extensions/mcplugins/` and `extensions/version/` hold the sources of two extensions from the
+panel (MC Plugins by sarthak77, VersionManager by Avicuz) with local fixes. Their licences are not
+stated in the packages, so these folders are git-ignored; keep a copy of the built `.blueprint`
+files somewhere safe.
+
+| Extension | Local changes |
+|-----------|---------------|
+| `mcplugins` 2.1 → 2.1-fredrik.1 | Plugins tab locks itself unless the server has a `plugins` folder or its jar is identified as Paper/Spigot/Purpur/Folia/Sponge or a proxy; the API refuses installs on other servers; the `plugins` folder is created before the first install; routes require `file.read`; an uninitialised-variable warning in jar detection fixed. |
+| `version` 1.0.0 → 1.0.1-fredrik.1 | **Security:** the API moved from Blueprint's unauthenticated web routes (anyone with a server id could wipe and reinstall a server) to the panel's client API, scoped to the server and gated by `file.read`/`file.create`, with `file.delete`, `startup.update` and `startup.docker-image` checked where relevant; input validation on type/version; activity log entries; an install script removes the legacy routes on upgrade. **Install flow rebuilt:** the jar is downloaded by Wings in the background and polled until complete, and only then are old files deleted and the startup command/`SERVER_JARFILE`/Java image updated. The original pulled in the foreground through the panel's 15 s timeout and deleted files first, which left servers with no jar and a stale `server.jar` startup. |
+
+Rebuild either with `extensions/package.sh <id>`. The `dev-stack.sh` script spins up a throwaway panel
+to try them.
+
+## Bundled egg fixes
+
+The panel re-seeds its bundled eggs on every boot (matching author `support@pterodactyl.io` plus
+egg name, overwriting the install script, startup, image list and variables; custom eggs are never
+touched). This image overrides one of those seed files:
+
+| Egg | File | Why |
+|-----|------|-----|
+| Forge Minecraft | `eggs/egg-forge-minecraft.json` (script: `eggs/forge-install.sh`) | The stock install script matches Forge versions with `contains`, so `1.21.1` also matches `1.21.10`/`1.21.11` and the install fails; and it decides between `unix_args.txt` and a jar with a regex for `1.17`…`1.23`, so Minecraft 26.x installs "succeed" with no jar and no `unix_args.txt` and the server crashes with `Unable to access jarfile server.jar`. The fixed script matches keys exactly, decides by what the installer produced, and fails loudly otherwise. |
+
+Because the seeder runs at boot, the fix lands on the existing egg (and every server using it) the
+first time a container starts from an image built with this file. Until then, paste
+`eggs/forge-install.sh` into Admin > Nests > Minecraft > Forge Minecraft > Install Script; the next
+container restart reverts that, so rebuild the image soon after.
+
 ## Upgrading a live deployment
 
 The panel image runs `php artisan migrate --seed --force` automatically on boot,
